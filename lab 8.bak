@@ -1,0 +1,114 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname |lab 8|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require htdp/dir)
+     
+; A File is a (make-file String Integer Date String)
+;(define-struct file [name size date content])
+; - where name is the name of the file (including extension)
+; - size is the size of the file in bytes
+; - date is the last modified date of the file
+; - and content is the contents of the file
+     
+; A Date is a (make-date Integer Integer Integer Integer Integer Integer)
+;(define-struct date [year month day hours minutes seconds])
+; - where year is the year the file was modified
+; - month is the month the file was modified
+; - day is the day the file was modified
+; - hours is the hour the file was modified
+; - minutes is the minute the file was modified
+; - and seconds is the second the file was modified
+     
+; A Directory is a (make-dir Symbol [List-of Directory] [List-of File])
+;(define-struct dir [name dirs files])
+; - where name is the directory path
+; - dirs is the list of sub-directories in this directory
+; - and files is the list of files in this directory
+;   (not including the ones in sub-directories)
+     
+     
+(define EMPTY-DIR (make-dir 'hopes&dreams '() '()))
+(define CAREER
+  (make-dir
+   'Career
+   (list (make-dir 'CareerApplications
+                   '()
+                   (list (make-file "CoverLetter.doc" 31744
+                                    (make-date 2015 9 20 11 36 25) "")
+                         (make-file "EmploymentApplication.pdf" 231010
+                                    (make-date 2015 10 13 13 10 0) "")))
+         (make-dir 'CareerMyJob
+                   '()
+                   (list (make-file "BackgroundCheck.pdf" 1040138
+                                    (make-date 2016 8 23 10 27 10) "")
+                         (make-file "I9.pdf" 963654
+                                    (make-date 2015 11 20 15 49 45) "")
+                         (make-file "JobOffer.pdf" 507887
+                                    (make-date 2015 11 20 15 49 0) ""))))
+   (list (make-file "References.docx" 11634
+                    (make-date 2016 8 6 9 55 15) "")
+         (make-file "Resume.doc" 34816
+                    (make-date 2016 10 12 13 18 12) "")
+         (make-file "Transcript.doc" 140288
+                    (make-date 2015 9 11 9 3 0) ""))))
+     
+; file-temp : File -> ?
+(define (file-temp f)
+  (... (file-name f) (file-size f) (date-temp (file-date f)) (file-content f)))
+     
+; date-temp : Date -> ?
+(define (date-temp d)
+  (... (date-year d) (date-month d) (date-hours d) (date-minutes d) (date-seconds d)))
+     
+; directory-temp : Directory -> ?
+(define (directory-temp d)
+  (... (dir-name d) (lod-temp (dir-dirs d)) (lof-temp (dir-files d))))
+     
+; lod-temp : [List-of Directory] -> ?
+(define (lod-temp lod)
+  (cond [(empty? lod) ...]
+        [(cons? lod) (... (directory-temp (first lod)) (lod-temp (rest lod)))]))
+     
+; lof-temp : [List-of File] -> ?
+(define (lof-temp lof)
+  (cond [(empty? lof) ...]
+        [(cons? lof) (... (file-temp (first lof)) (lof-temp (rest lof)))]))
+
+;Sample Problem Design a function that consumes a Directory and produces the total number of files in it, however deeply they might be nested inside directories.
+
+; count-files : Directory -> Natural
+; Count the number of files in d and its sub-directories recursively
+(define (count-files d)
+  (foldr (λ (sub-dir count)
+           (+ (count-files sub-dir) count))
+         (length (dir-files d))
+         (dir-dirs d)))
+(check-expect (count-files EMPTY-DIR) 0)
+(check-expect (count-files CAREER) 8)
+
+
+;file-in-dir?: String Dir -> Boolean
+;Does the given file name exist in the directory?
+(define (file-in-dir? name dir)
+  (local [
+          ;file-in-lof?: File [List-of File] -> Boolean
+          ;is the given file in the given list of files?
+          (define (file-in-lof? lof)
+            (ormap (lambda (f) (string=? (file-name f) name)) (dir-files dir)))]
+    (or
+     (file-in-lof? (dir-files dir))
+     (ormap (lambda (d) (file-in-dir? name d)) (dir-dirs dir)))))
+(check-expect (file-in-dir? "name" EMPTY-DIR) #f)
+(check-expect (file-in-dir? "CoverLetter.doc" CAREER) #t)
+(check-expect (file-in-dir?  "fadsfads" CAREER) #f)
+
+;total-size: Dir -> NNN
+(define (total-size dir)
+  (local [;total-size/lof: [List-of File] -> Nat
+          ;returns the size of the given list of files
+          (define (total-size/lof lof)
+            (foldr (lambda (f prev) (+ (file-size f) prev)) 0 lof))]
+     (foldr (lambda (d prev) (+ (total-size/lof (dir-files d)) prev)) (total-size/lof (dir-files dir)) (dir-dirs dir))))
+(check-expect (total-size EMPTY-DIR) 0)
+(check-expect (total-size CAREER) 2961171)
+

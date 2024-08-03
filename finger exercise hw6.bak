@@ -1,0 +1,41 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname |finger exercise hw6|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; A GC (GroceryCatalogue) is one of:
+; - '()
+; - (cons CE GC)
+; where each catalogue entry has a unique name
+
+
+;update-gc: GC String [Cost -> Cost] -> GC
+; applies the given function to the previously
+; associated cost of the food with the given name and leaves the rest
+; of the catalogue untouched
+(define (update-gc gc food-name convert-cost)
+  (cond
+    [(empty? gc) '()]
+    [(and (cons? gc) (string=? (first gc) food-name))]
+    [(cons? gc) (update-gc (rest gc) food-name convert-cost)] 
+
+
+; A CE (CatalogueEntry) is a
+; (make-ce String Cost)
+(define-struct ce [name cost])
+; and represents the name of a food and how much it costs
+ 
+; A Cost is one of:
+; - (make-unit Number)
+; - (make-lb Number)
+(define-struct unit [cost])
+(define-struct lb [cost])
+; and represents either the cost per unit or per lb of an item
+ 
+; A Checkout is one of:
+; - '()
+; - (cons Order Checkout)
+ 
+; A Order is one of:
+; - String
+; - (make-weight String Number)
+(define-struct weight [name lb])
+; and represents either one unit of food or its name and weight in lbs

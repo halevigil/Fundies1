@@ -1,0 +1,300 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname HW10) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Exercise 2
+(define-struct pair [fst snd])
+; a [Pair-of A B] is a (make-pair A B)
+ 
+; A Type is one of:
+; - 'number
+; - 'boolean
+; - 'string
+(define-struct pair-ty [fst snd])
+; - (make-pair-ty Type Type)
+(define-struct fun-ty [arg ret])
+; - (make-fun-ty Type Type)
+(define-struct list-of [ty])
+; - (make-list-of Type) 
+ 
+; Interpretation: a Type represents different types of data we use in our programs.
+; In particular, these are some of the types we write in our signatures.
+ 
+#;(define (type-temp type)
+    (cond [(equal? type 'number) ...]
+          [(equal? type 'boolean) ...]
+          [(equal? type 'string) ...]
+          [(pair-ty? type) (... (type-temp (pair-ty-fst type)) ...
+                                (type-temp (pair-ty-snd type)) ...)]
+          [(fun-ty? type) (... (type-temp (fun-ty-arg type)) ...
+                               (type-temp (fun-ty-ret type)) ...)]
+          [(list-of? type) ( ... (type-temp (list-of-ty type)) ... )]))
+
+(define Number 'number)
+(define Boolean 'boolean)
+(define String 'string)
+(define (Pair-of A B) (make-pair-ty A B))
+(define (Function X Y) (make-fun-ty X Y))
+(define (List X) (make-list-of X))
+
+(define (enforce type x)
+  (local ((define (err _) (error "the type didn't match: "
+                                 x " : " type)))
+    (cond [(equal? type 'number) (if (number? x) x (err 1))]
+          [(equal? type 'boolean) (if (boolean? x) x (err 1))]
+          [(equal? type 'string) (if (string? x) x (err 1))]
+          [(pair-ty? type) (if (pair? x)
+                               (make-pair
+                                (enforce (pair-ty-fst type) (pair-fst x))
+                                (enforce (pair-ty-snd type) (pair-snd x)))
+                               (err 1))]
+          [(fun-ty? type)
+           (if (procedure? x)
+               (lambda (y)
+                 (local ((define arg (enforce (fun-ty-arg type) y)))
+                   (enforce (fun-ty-ret type) (x arg))))
+               (err 1))]
+          [(list-of? type)
+           (if (list? x) (map (λ (n) (enforce (list-of-ty type) n)) x) (err 1))])))
+ 
+(check-expect (enforce Number 1) 1)
+(check-error (enforce Number "hi"))
+(check-expect (enforce Boolean #true) #true)
+(check-expect (enforce String "hi") "hi")
+(check-error (enforce String 34))
+(check-expect (enforce (Pair-of Number Number) (make-pair 1 2)) (make-pair 1 2))
+(check-error (enforce (Pair-of Number String) 1))
+(check-expect ((enforce (Function Number Number) (lambda (x) x)) 1) 1)
+(check-error ((enforce (Function Number Number) (lambda (x) x)) "hi"))
+(check-error ((enforce (Function Number String) (lambda (x) x)) 1))
+(check-expect (enforce (List Number) (list 1 2 3 4)) (list 1 2 3 4))
+(check-error (enforce (List String) (list 1 2 3 4)))
+(check-expect ((enforce (Function (List Boolean) (List Number))
+                        (lambda (x) (if (first x) (list 1) (list 0))))
+               (list #t #f)) (list 1))
+
+; positive : Number -> Boolean
+; returns whether number is positive
+(define positive (enforce (Function Number Boolean)
+                          (lambda (x)
+                            (cond
+                              [(<= x 0) "nonpositive"]
+                              [(> x 0) "positive"]))))
+
+; sum-list : [List-of Number] -> Number
+; Adds up the numbers in the list
+#;(define (sum-list lon)
+    (cond
+      [(empty? lon) 0]
+      [(cons? lon) (+ (first lon) (sum-list (first lon)))]))
+
+(check-error (sum-list (list 1 2 3 4)))
+(check-error (sum-list (list "hi" "h" "e")))
+(check-error (sum-list (list "hi" 1 3 4)))
+(check-error (sum-list 1))
+
+(define sum-list (enforce (Function (List Number) Number)
+                          (λ (x)
+                            (cond
+                              [(empty? x) 0]
+                              [(cons? x) (+ (first x) (sum-list (first x)))]))))
+
+; contains-frog? : [List-of String] -> Boolean
+; Returns whether or not the list contains "frog"
+#;(define (contains-frog? los)
+    (cond
+      [(empty? los) "false"]
+      [(cons? los) (or (string=? (first los) "frog")
+                       (contains-frog? (first los)))]))
+
+(check-error (contains-frog? (list "hi" "h" "frog")))
+(check-expect (contains-frog? (list "frog" "f" "toad")) #t)
+(check-error (contains-frog? (list 1 2 3)))
+(check-error (contains-frog? 1 2))
+(check-error (contains-frog? "frog"))
+
+(define contains-frog? (enforce (Function (List String) Boolean)
+                                (λ (x)
+                                  (cond
+                                    [(empty? x) "false"]
+                                    [(cons? x) (or (string=? (first x) "frog")
+                                                   (contains-frog? (first x)))]))))
+;Exercise 3
+;; type->string : Type -> String
+;; Given a Type, produces a String of the given Type
+
+(check-expect (type->string String)
+              "String")
+(check-expect (type->string (Pair-of Number Boolean))
+              "[Pair-of Number Boolean]")
+(check-expect (type->string (Function (Function Number Number) String))
+              "[[Number -> Number] -> String]")
+
+(define (type->string type)
+  (cond [(equal? type 'number) "Number"]
+        [(equal? type 'boolean) "Boolean"]
+        [(equal? type 'string) "String"]
+        [(pair-ty? type) (string-append "[Pair-of " (type->string (pair-ty-fst type)) " "
+                                        (type->string (pair-ty-snd type)) "]")]
+        [(fun-ty? type) (string-append "[" (type->string (fun-ty-arg type)) " -> "
+                                       (type->string (fun-ty-ret type)) "]")]
+        [(list-of? type) (string-append "List-of " (type->string (list-of-ty type)))]))
+
+;Exercise 4
+; A [Set-of X] is a [List-of X] with no repeated values
+; it represents a set
+(define s1 '())
+(define s2 (list 1 4))
+
+; A Graph is a (make-graph [Set-of Symbol] [Symbol -> [Set-of Symbol]])
+(define-struct graph [nodes neighbors])
+; and represents the nodes and edges in a graph.
+(define gr1 (make-graph (list 'a 'b 'c 'd)
+                        (λ (n)
+                          (cond
+                            [(symbol=? n 'a) (list 'b 'd)]
+                            [(symbol=? n 'b) (list 'c 'd)]
+                            [(symbol=? n 'c) (list 'b)]
+                            [(symbol=? n 'd) '()]))))
+(define gr2 (make-graph (list 'c 'a 'b 'd)
+                        (λ (n)
+                          (cond
+                            [(symbol=? n 'a) (list 'd 'b)]
+                            [(symbol=? n 'b) (list 'c 'd)]
+                            [(symbol=? n 'c) (list 'b)]
+                            [(symbol=? n 'd) '()]))))
+(define gr3 (make-graph (list 'c 'a 'd)
+                        (λ (n)
+                          (cond
+                            [(symbol=? n 'a) (list 'd 'b)]
+                            [(symbol=? n 'c) (list 'b)]
+                            [(symbol=? n 'd) '()]))))
+(define gr4 (make-graph (list 'c 'a 'b 'd)
+                        (λ (n)
+                          (cond
+                            [(symbol=? n 'a) (list 'b)]
+                            [(symbol=? n 'b) (list 'c 'd)]
+                            [(symbol=? n 'c) (list 'b)]
+                            [(symbol=? n 'd) '()]))))
+
+
+;e-in-set?: [Set-of X] X  [X X -> Boolean] -> Boolean
+;is the given element in the given set?
+(define (e-in-set? s set equiv?)
+  (ormap (λ (x) (equiv? s x)) set))
+(check-expect (e-in-set? 'a (list 'c 'a 'b)) #t)
+(check-expect (e-in-set? 'a (list 'c 'd 'b)) #f)
+
+;neighbor-of?: Graph Symbol Symbol -> Boolean
+;is the second node a neighbor of the first?
+(define (neighbor-of? graph node1 node2)
+  (local [(define neighbors-fn (graph-neighbors graph))]
+    (e-in-set? node2 (neighbors-fn node1) symbol=?)))
+(check-expect (neighbor-of? gr1 'a 'b) #t)
+(check-expect (neighbor-of? gr1 'c 'a) #f)
+;Exercise 5
+;union: {X} [Set-of X] [Set-of X] [X X -> Boolean] -> [Set-of X]
+;returns the union of the two sets
+(define (union s1 s2 equiv?)
+  (append (filter (λ (e) (not (e-in-set? e s1 equiv?))) s2) s1))
+(check-expect (set=? (union (list 'a 'b) (list 'a 'c) symbol=?) (list 'c 'a 'b) symbol=?) #t)
+(check-expect (set=? (union (list 0 1) (list 0 1) =) (list 0 1) =) #t)
+
+;set=?: {X} : [Set-of X] [Set-of X] [X X -> Boolean] -> Boolean
+;are the two given sets equal?
+(define (set=? s1 s2 equiv?)
+  (and (= (length s1) (length s2))
+       (andmap (λ (e) (e-in-set? e s2 equiv?)) s1)))
+(check-expect (set=? (list 0 1) (list 0 1 2) =) #f)
+(check-expect (set=? (list 0 4 1) (list 0 1 2) =) #f)
+(check-expect (set=? (list 0 4 1) (list 0 1 4) =) #t)
+
+;both-neighbors: Graph Symbol Symbol -> [Set-of Symbol]
+;returns the set containing all neighbors of both functions
+
+(check-expect (set=? (both-neighbors gr1 'a 'b) (list 'b 'c 'd) symbol=?) #t)
+(check-expect (set=? (both-neighbors gr1 'a 'c) (list 'b 'd) symbol=?) #t)
+
+(define (both-neighbors graph node1 node2)
+  (local [(define neighbors-fn (graph-neighbors graph))]
+    (union (neighbors-fn node1) (neighbors-fn node2) symbol=?)))
+
+;; Exercise 6
+;graph=?: Graph Graph -> Boolean
+;are the two graphs equal?
+(define (graph=? g1 g2)
+  (local [(define nodes1 (graph-nodes g1))
+          (define nodes2 (graph-nodes g2))
+          (define neighbors1 (graph-neighbors g1))
+          (define neighbors2 (graph-neighbors g2))]
+    (and (set=? nodes1 nodes2 symbol=?)
+         (andmap (λ (e) (set=? (neighbors1 e) (neighbors2 e) symbol=?)) nodes1))))
+
+(check-expect (graph=? gr1 gr2) #t)
+(check-expect (graph=? gr2 gr3) #f)
+(check-expect (graph=? gr2 gr4) #f)
+
+;; Exercise 7
+
+; make-graph=? : Graph -> [Graph -> Boolean]
+; Takes a graph and produces a function that checks if
+; its argument is graph=? to the original graph
+(define make-graph=? (λ (g1) (λ (g2) (graph=? g1 g2))))
+
+; f : Graph ... -> Graph
+; Do something to g
+#;(define (f g ...) ...)
+ 
+#;(check-satisfied (f some-input-graph ...)
+                   (make-graph=?
+                    some-expected-graph))
+
+;; collapse : Symbol Symbol Symbol Graph -> Graph
+;; collapses _n1_ _n2_ into one new node, which is named by _n3_.
+;; All nodes in the graph that were pointing to either _n1_ and _n2_ should now point to _n3_,
+;; and _n3_ should point to all nodes either _n1_ and _n2_ were pointing to
+
+(check-satisfied (collapse 'a 'b 'f gr1)
+                 (make-graph=?
+                  (make-graph (list 'f 'c 'd)
+                              (λ (n)
+                                (cond
+                                  [(symbol=? n 'f) (list 'f 'c 'd)]
+                                  [(symbol=? n 'c) (list 'f)]
+                                  [(symbol=? n 'd) '()])))))
+
+(check-satisfied (collapse 'd 'a 'z gr2)
+                 (make-graph=?
+                  (make-graph (list 'z 'b 'c)
+                              (λ (n)
+                                (cond
+                                  [(symbol=? n 'z) (list 'z 'b)]
+                                  [(symbol=? n 'b) (list 'c 'z)]
+                                  [(symbol=? n 'c) (list 'b)])))))
+
+(define (collapse n1 n2 n3 gr)
+  (local [(define nodes (graph-nodes gr))
+          (define neigh (graph-neighbors gr))]
+    (make-graph (replace n1 n2 n3 nodes)
+                (λ (n)
+                  (if (symbol=? n n3)
+                      (replace n1 n2 n3 (both-neighbors gr n1 n2))
+                      (replace n1 n2 n3 (neigh n)))))))
+
+;; replace : Symbol Symbol Symbol [Set-of Symbol] -> [Set-of Symbol]
+;; replaces the instance of _s1_ and/or _s2_ with _s3_ in a given set of symbols
+;; Assume _s3_ is not in the set
+
+(check-expect (replace 'a 'b 'f (list 'a 'b 'c 'd)) (list 'f 'c 'd))
+(check-expect (replace 'a 'b 'f (list 'a 'c 'd 'q)) (list 'f 'c 'd 'q))
+(check-expect (replace 'a 'b 'f (list 'w 'e 'r 'h)) (list 'w 'e 'r 'h))
+(check-expect (replace 'a 'b 'f (list 'c 'a 'd 'q)) (list 'c 'f 'd 'q))
+
+(define (replace s1 s2 s3 ss)
+  (foldr (λ (n ans-so-far)
+           (cond
+             [(and (or (symbol=? n s1) (symbol=? n s2)) (not (e-in-set? s3 ans-so-far symbol=?)))
+              (cons s3 ans-so-far)]
+             [(and (or (symbol=? n s1) (symbol=? n s2)) (e-in-set? s3 ans-so-far symbol=?))
+              ans-so-far]
+             [else (cons n ans-so-far)])) '() ss))
+             

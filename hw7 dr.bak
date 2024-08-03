@@ -1,0 +1,462 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname |hw7 dr|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+#lang racket
+(require 2htdp/image)
+(require 2htdp/universe)
+
+;;; Drawing Code is from Homework 5, though it has been modified
+;;; to change the data definition for a Cell in line with feedback on our
+;;; previous homework
+;Homework 5 Exercise 5
+
+; A Color is one of
+; - "red"
+; - "green"
+; - "blue"
+; - "purple"
+; and represents the color of a trophy or target.
+(define color-rde "red")
+(define color-grn "green")
+(define color-blu "blue")
+(define color-pur "purple")
+#;(define (color-temp c)
+    (cond
+      [(string=? c "red") ... ]
+      [(string=? c "green") ... ]
+      [(string=? c "blue") ... ]
+      [(string=? c "purple") ... ]))
+
+; A Trophy is a (make-trophy c)
+; It represents a trophy with color c
+(define-struct trophy (color))
+(define ret (make-trophy color-rde))
+(define grt (make-trophy color-grn))
+(define blt (make-trophy color-blu))
+(define prt (make-trophy color-pur))
+
+#;(define (trophy-temp t)
+    (... (trophy-color t) ...))
+
+
+
+
+; A Target is a (make-target Color Movable)
+; It represents a target with a color and other movable
+; objects that share a cell with it
+(define-struct target (color other))
+(define target-g (make-target color-grn m1))
+(define target-b (make-target color-blu m2))
+(define target-r (make-target color-rde m3))
+(define target-p (make-target color-pur m4))
+(define tbe (make-target color-blu "e"))
+(define tre (make-target color-rde "e"))
+(define tge (make-target color-grn "e"))
+(define tpe (make-target color-pur "e"))
+(define tpf (make-target color-pur prt))
+(define tpt (make-target color-pur blt))
+
+#;(define (target-temp t)
+    (... (color-temp (target-color t))
+         ... (movable-temp (target-other t)) ...))
+; A Movable is one of:
+; - Trophy
+; - "p" (player)
+; - "c" (crate)
+; - "e" (empty)
+; and represents cell objects that can move
+
+(define m1 "p")
+(define m2 "e")
+(define m3 "c")
+(define m4 prt)
+
+#;(define (movable-temp c)
+    (cond
+      [(trophy? c) ... (trophy-temp c)]
+      [(and (string? c) (string=? c "e"))...]
+      [(and (string? c) (string=? c "p"))...]
+      [(and (string? c) (string=? c "c"))...]))
+
+; movable?: Any -> Boolean
+; is the given element a valid Movable?
+(define (movable? e)
+   (cond
+      [(trophy? c) #t]
+      [(and (string? c) (string=? c "e")) #t]
+      [(and (string? c) (string=? c "p")) #t]
+      [(and (string? c) (string=? c "c")) #t]
+      [else #f]))
+(check-expect (movable? prt) #t)
+(check-expect (movable? "e") #t)
+(check-expect (movable? "w") #t)
+
+; A NonFloor is one of:
+; - Movable
+; - "w" (wall)
+; and represents cell objects that are not in the floor
+(define n1 "w")
+(define n2 "e")
+(define n3 "c")
+
+; A Cell is one of:
+; - "w" (wall)
+; - Target
+; - Movable
+; and represents the contents of one cell in the game.
+(define c1 "e")
+(define c2 "w")
+(define c3 "c")
+(define c4 "p")
+(define c5 blt)
+(define c6 target-p)
+(define c7 tbe)
+
+#;(define (cell-temp c)
+    (cond
+      [(and (string? c) (string=? c "w"))...]
+      [(target? c) ... (target-temp c)]
+      [(movable? c) (movable-temp c)])
+
+; A Row is a [List-of Cell]
+; It represents one row in the game board
+(define row1 (list c1 c2 c3))
+(define row2 (list c2 c3 c3))
+(define row3 (list c1 c4 c5))
+(define row4 (list "w" tre ret "p" grt "c" tge "w"))
+(define row5 (list "w" "w" "e" prt "w" "w" "w" "w"))
+(define row6 (list "w" tpf ret "p" grt "c" tpf "w"))
+
+#;(define (row-temp r)
+    (cond
+      [(empty? r) ...]
+      [(cons? r) (... (cell-temp (first r)) ... (row-temp (rest r)))]))
+
+; A Board is a [List-of Row]
+; It describes the current state of the board at a given time
+(define board1 (list row1 row2 row3))
+
+(define board2
+  (list
+   (list "e" "e" "w" "w" "w" "e" "e" "e")
+   (list "e" "e" "w" tbe "w" "w" "e" "e")
+   (list "w" "w" "w" blt "e" "w" "w" "w")
+   (list "w" tre ret "p" grt "c" tge "w")
+   (list "w" "w" "e" prt "w" "w" "w" "w")
+   (list "e" "w" "w" tpe "w" "e" "e" "e")
+   (list "e" "e" "w" "w" "w" "e" "e" "e")))
+
+(define board3 (list row4 row5))
+(define board4 (list row6 row6))
+
+(define board5
+  (list
+   (list "e" "e" "w" "w" "w" "e" "e" "e")
+   (list "e" "e" "w" tbe "w" "w" "e" "e")
+   (list "w" "w" "w" blt "e" "w" "w" "w")
+   (list "w" "e" "e" "p" grt "c" tge "w")
+   (list "w" "w" "e" prt "w" "w" "w" "w")
+   (list "e" "w" "w" tpe "w" "e" "e" "e")
+   (list "e" "e" "w" "w" "w" "e" "e" "e")))
+
+#;(define (board-temp b)
+    (cond
+      [(empty? b) ...]
+      [(cons? b) (... (row-temp (first b)) ... (board-temp (rest b)))]))
+
+;Homework 5 Exercise 6
+(define CELL-SIZE 66)
+(define CELL-SIZE-BASE 132)
+; draw-target-base : Color -> Image
+; Draws a target base (three concentric circles, with integer multiple 1-2-3 radii,
+; with the middle one white) in the given color
+(check-expect (draw-target-base "red") (overlay
+                                        (circle (/ CELL-SIZE 8) "solid" "red")
+                                        (circle (/ CELL-SIZE 4) "solid" "white")
+                                        (circle (* 3 (/ CELL-SIZE 8)) "solid" "red")
+                                        (rectangle CELL-SIZE CELL-SIZE "solid" "white")))
+
+(define (draw-target-base c)
+  (overlay (circle (/ CELL-SIZE 8) "solid" c)
+           (circle (/ CELL-SIZE 4) "solid" "white")
+           (circle (* 3 (/ CELL-SIZE 8)) "solid" c)
+           (rectangle CELL-SIZE CELL-SIZE "solid" "white")))
+
+; draw-trophy : Trophy -> Image
+; Draws a trophy (isosceles triangle and rectangle) in the given trophy's color
+(check-expect (draw-trophy grt) (overlay
+                                 (rectangle (/ CELL-SIZE 8)
+                                            (* 7 (/ CELL-SIZE 8)) "solid" "green")
+                                 (isosceles-triangle CELL-SIZE 30 "solid" "green")
+                                 (rectangle CELL-SIZE CELL-SIZE "solid" "white")))
+(define (draw-trophy t)
+  (overlay (rectangle (/ CELL-SIZE 8) (* 7 (/ CELL-SIZE 8)) "solid" (trophy-color t))
+           (isosceles-triangle CELL-SIZE 30 "solid" (trophy-color t))
+           (rectangle CELL-SIZE CELL-SIZE "solid" "white")))
+
+; draw-target : Target -> Image
+; Converts the given target into an image
+(check-expect (draw-target target-g) (overlay
+                                      (draw-movable m1)
+                                      (draw-target-base "green")))
+(check-expect (draw-target target-b) (overlay
+                                      (draw-movable m2)
+                                      (draw-target-base "blue")))
+(check-expect (draw-target target-r) (overlay
+                                      (draw-movable m3)
+                                      (draw-target-base "red")))
+(check-expect (draw-target target-p) (overlay
+                                      (draw-movable m4)
+                                      (draw-target-base "purple")))
+(define (draw-target t)
+  (overlay
+   (draw-movable (target-other t))
+   (draw-target-base (target-color t))))
+
+
+; draw-movable : Movable -> Image
+; Converts the given movable object into an image
+(check-expect (draw-movable m1) PLAYR)
+(check-expect (draw-movable m2) empty-image)
+(check-expect (draw-movable m3) RCRAT)
+(check-expect (draw-movable m4) (draw-trophy m4))
+(define (draw-movable c)
+  (cond
+    [(trophy? c) (draw-trophy c)]
+    [(and (string? c) (string=? c "e")) empty-image]
+    [(and (string? c) (string=? c "p")) PLAYR]
+    [(and (string? c) (string=? c "c")) RCRAT]))
+
+; draw-cell : Cell -> Image
+; Converts the given cell into an image
+(check-expect (draw-cell c1) (rectangle CELL-SIZE CELL-SIZE "solid" "white"))
+(check-expect (draw-cell c2) BRICK)
+(check-expect (draw-cell c3) CRATE)
+(check-expect (draw-cell c4) PLAYR)
+(check-expect (draw-cell c5) (draw-trophy c5))
+(check-expect (draw-cell c6) (draw-target c6))
+(define (draw-cell c)
+  (cond
+    [(and (string? c) (string=? c "w")) BRICK]
+    [(target? c) (draw-target c)]
+    [(movable? c) (draw-movable c))
+
+; draw-row : Row -> Image
+; Converts the given row into an image
+(check-expect (draw-row row4) (beside
+                               (draw-cell "w")
+                               (draw-cell tre)
+                               (draw-cell ret)
+                               (draw-cell "p")
+                               (draw-cell grt)
+                               (draw-cell "c")
+                               (draw-cell tge)
+                               (draw-cell "w")
+                               empty-image))
+(define (draw-row r)
+  (cond
+    [(empty? r) empty-image]
+    [(cons? r) (beside (draw-cell (first r)) (draw-row (rest r)))]))
+
+; board->image : Board -> Image
+; Converts the given board into an image
+(check-expect (board->image board3) (above
+                                     (draw-row row4)
+                                     (draw-row row5)))
+
+(define (board->image b)
+  (cond
+    [(empty? b) empty-image]
+    [(cons? b) (above (draw-row (first b)) (board->image (rest b)))]))
+
+
+;(draw-target target-g)
+;(draw-target target-b)
+;(draw-target target-r)
+;(draw-target target-p)
+;(draw-row (list "w" tre ret "p" grt "c" tge "w"))
+;(board->image board2)
+
+;;;
+;Homework 5 Exercise 7
+; level-won? : Board -> Boolean
+; Returns true if every target has a matching color trophy
+; above it
+(check-expect (level-won? board2) #f)
+(check-expect (level-won? board4) #t)
+(define (level-won? b)
+  (cond
+    [(empty? b) #t]
+    [(cons? b) (and (row-won? (first b)) (level-won? (rest b)))]))
+
+; row-won? : Row -> Boolean
+; Returns true if every target in the row has a matching color trophy
+; above it
+(check-expect (row-won? row4) #f)
+(check-expect (row-won? row5) #t)
+(check-expect (row-won? row6) #t)
+(define (row-won? r)
+  (cond
+    [(empty? r) #t]
+    [(cons? r) (and (cell-won? (first r)) (row-won? (rest r)))]))
+
+; cell-won : Cell -> Boolean
+; Returns true unless the cell is an unfilled target
+(check-expect (cell-won? c1) #t)
+(check-expect (cell-won? c2) #t)
+(check-expect (cell-won? c3) #t)
+(check-expect (cell-won? c4) #t)
+(check-expect (cell-won? c5) #t)
+(check-expect (cell-won? c6) #t)
+(check-expect (cell-won? c7) #f)
+(define (cell-won? c)
+  (cond
+    [(target? c) (target-filled? c)]
+    [else #t]))
+
+; target-filled? : Target -> Boolean
+; Returns true if the target is covered in a same-color trophy
+(check-expect (target-filled? tbe) #f)
+(check-expect (target-filled? tpf) #t)
+(check-expect (target-filled? tpt) #f)
+(define (target-filled? t)
+  (and
+   (trophy? (target-other t))
+   (string=? (trophy-color (target-other t))
+             (target-color t))))
+;;; Homework 7 Exercise 2
+
+; set-nonfloor : Cell Cell -> [Pair-of Cell]
+; sets the nonfloor value (whether or not the cell has a floor object) of a given cell
+(check-expect (set-nonfloor "e" "e") "e")
+(check-expect (set-nonfloor "w" "c") "c")
+(check-expect (set-nonfloor "w" prt) prt)
+(check-expect (set-movable (make-target "red" "e") "c") (make-target "red" "c"))
+(define (set-nonfloor c v)
+  (local [;set-nonfloor/target: Cell -> Cell
+          ;sets the nonfloor from the other of a target
+          (define (set-nonfloor/target t v)
+            (make-target (target-color t) v))]
+    (cond
+    [(and (string? c) (string=? c "w")]
+    [(target? w)]
+
+; get-nonfloor : Cell -> NonFloor
+; gets the nonfloor value (whether or not the cell has a floor object) of a given cell
+(define (get-nonfloor c)
+  (cond
+      [(and (string? c) (string=? c "w")) "w"]
+      [(target? c) (target-other c)]
+      [(movable? c) c]))
+(check-expect (get-nonfloor "e") "e")
+(check-expect (get-nonfloor "w") "w")
+(check-expect (get-nonfloor (make-target "red" "c")) "c")
+
+
+;player-in-cell? Cell -> Boolean
+;is the player in the given cell?
+(define (player-in-cell? c)
+   (and (string? (get-nonfloor c)) (string=? (get-nonfloor c) "p")))
+(check-expect (player-cell? "p") #t)
+(check-expect (player-cell? "e") #f)
+(check-expect (player-cell? prt) #f)
+
+; player-in-row? : Row -> Boolean
+; is the player in the given row?
+(check-expect (player-in-row? '()) #f)
+(check-expect (player-in-row? (list "w" "e" "p" "e" "w")) #t)
+(check-expect (player-in-row? (list "w" "e" target-g "e" "w")) #t)
+(define (player-in-row? r)
+  (cond
+    [(empty? r) #f]
+    [(cons? r) (or (player-cell? (first r)) (player-row? (rest r)))]))
+
+;main: Board -> Board
+(define (main b)
+  (big-bang b
+  (to-draw board->image)
+  (stop-when level-won?)
+  (on-key move-player)))
+
+;Homework 7 Exercise 2
+
+;add-elements-to-corresponding-lists: [List-of X] [Pair-of [List-of [List-of X]] -> [List-of [List-of X]]]
+;appends each element in li1 to its corresponding list in li2
+(define (add-elements-to-corresponding-lists li1 li2)
+  (cond
+    [(empty? li1) li2]
+    [(cons? li1) (cons (cons (first li1) (first li2))
+                       (add-elements-to-corresponding-lists (rest li1) (rest li2)))]))
+(check-expect (add-elements-to-corresponding-lists '() (list (list 4 5) (list 6 7)))
+              (list (list 4 5) (list 6 7)))
+(check-expect (add-elements-to-corresponding-lists (list 1 2) (list (list 4 5) (list 6 7)))
+              (list (list 1 4 5) (list 2 6 7)))
+
+;rotate-cw: [Lo [Lo N]] -> Board
+;rotates the given board clockwise 90*
+(define (rotate-cw l)
+  (local [;Add-empties: [List-of X] Natural -> [List-of X]
+          ;prepends n empty lists to a list
+          (define (add-empties prev-list n)
+            (cond
+              [(= n 0) prev-list]
+              [else (add-empties (cons '() prev-list) (sub1 n))]))
+          (define init (add-empties '() (length (first l))))]
+    (foldl add-elements-to-corresponding-lists init l)))
+(check-expect (rotate-cw (list (list 1 2 3))) (list (list 1) (list 2) (list 3)))
+(check-expect (rotate-cw (list (list 1 2 3) (list 4 5 6))) (list (list 4 1) (list 5 2) (list 6 3)))
+
+; move-player : Board KeyEvent -> Board
+; Moves the player in the direction pressed
+(define (move-player b evt)
+   (local [;rotate-ccw: Board -> Board
+            ;rotates the given board counterclockwise 90*
+            (define (rotate-cw b)
+               (rotate-cw (rotate-cw (rotate-cw b))))
+            ;rotate-cw: Board -> Board
+            ;rotates the given board 180*
+            (define (rotate-180 b)
+               (rotate-cw (rotate-cw b)))
+         ]
+         (cond
+            [(string=? evt "left") (rotate-180 (move-right (rotate-180 b)))]
+            [(string=? evt "right") (move-right b)]
+            [(string=? evt "up") (rotate-ccw (move-right (rotate-cw b)))]
+            [(string=? evt "down") (rotate-cw (move-right (rotate-ccw b)))]
+            [else b])))
+
+; move-right : Board -> Board
+; Moves the player right in the Board, if this is possible
+(check-expect (move-right '()) '())
+(check-expect (move-right
+               (list
+                (list "w" "p" "e")
+                (list "w" "w" "w")))
+              (list
+               (list "w" "e" "p")
+               (list "w" "w" "w")))
+(define (move-right b)
+   (map (lambda (r) (if (player-in-row? r) (move-right/row r) r)) b))
+
+;move-right/row: Board [Row -> Row] -> Board
+;moves the player right in the row, if this is possible
+(check-expect (move-right/row '()) '())
+(check-expect (move-right/row (list "w" "p" "e" "w")) (list "w" "e" "p" "w"))
+(check-expect (move-right/row (list "w" "p" tge "w")) (list "w" "e" target-g "w"))
+(define (move-right/row r)
+   (local [(define (move-to-empty r)
+            (if (empty? (first (rest r)))
+               (list "e" "p" (rest (rest r)))
+               (list "e" "p" (rest (rest r)))))
+            ;pushable?
+            (define (pushable? c))
+            (define (move-push-object))
+            
+            
+            ])
+   (cond
+      [(empty? r) (error "tried to move player in empty row; code shouldn't reach here")]
+      [(empty? (rest r)) r]
+      [(empty? (rest (rest r)) (and (player-in-cell? (first r))) ] )
+
+(main board5)

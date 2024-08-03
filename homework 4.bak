@@ -1,0 +1,47 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |homework 4|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; Exercise 2
+; A LoI is one of:
+; '()
+; (cons Integer LoI)
+; it represents a list of integers
+(define loi0 '())
+(define loi1 (cons 1 loi0))
+(define loi2 (cons 0 loi1))
+(define loi3 (cons 1 loi2))
+
+(define (loi-temp loi)
+  (cond
+    [(empty? loi) ...]
+    [(cons? loi) ...(first loi)...(loi-temp (rest loi))]))
+
+; not-present?: LoI Integer -> Boolean
+; returns false if the integer is present
+; in the LoI, true otherwise
+(check-expect (not-present? loi0 0) #t)
+(check-expect (not-present? loi1 0) #t)
+(check-expect (not-present? loi2 0) #f)
+(check-expect (not-present? loi3 0) #f)
+
+(define (not-present? loi i)
+  (cond
+    [(empty? loi) #t]
+    [(cons? loi) (not (or (equal? i (first loi))
+                         (not-present? (rest loi))))]))
+
+;all-unique? LoI -> Boolean
+; returns true if every member of the LoI
+; is unique in the LoI, false otherwise
+(check-expect (all-unique? loi0) #t)
+(check-expect (all-unique? loi1) #t)
+(check-expect (all-unique? loi3) #t)
+(define (all-unique? loi)
+  (cond
+    [(empty? loi) #t]
+    [(cons? loi) (and
+                 (not-present? (rest loi) (first loi))
+                 (all-unique? (rest loi))
+                     )]))
+
+

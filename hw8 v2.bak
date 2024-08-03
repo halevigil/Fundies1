@@ -1,0 +1,496 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname |hw8 v2|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Exercise 2
+(define-struct node (key info left right))
+;A [BST X Y] is one of:
+;-'leaf
+;-(make-node X Y [BST X Y] [BST X Y])
+;where a (make-node k v l r) represents a bst node
+;with key k, value v, left branch l and right branch r
+; such that the keys on the left branch, are less than the key on the node,
+; and the keys on the right branch are greater than the key on the node.
+
+#;(define (bst-temp bst)
+    (cond
+      [(symbol? bst) ... ]
+      [(node? bst) ... (node-key bst) ... (node-info bst) ...
+                   (bst-temp (node-left bst)) ... (bst-temp (node-right bst)) ... ]))
+
+(define bst0 'leaf)
+(define bst1 (make-node "hi" 2 'leaf 'leaf))
+(define bst2 (make-node 4 "one"
+                        (make-node 3 "hi" 'leaf 'leaf)
+                        (make-node 5 "yo" 'leaf
+                                   (make-node 9 "brr" 'leaf 'leaf))))
+
+;A [Comparison X] is a [X X -> Real],
+;where a negative output indicates the first parameter comes
+;before the second, a positive output indicates the first parameter
+;comes after the second, and 0 indicates they are the same.
+;Examples: -, string-order-comp,string-length-comp
+
+(define string-order-comp
+  (λ (s1 s2)
+    (cond
+      [(string>? s1 s2) 1]
+      [(string=? s1 s2) 0]
+      [(string<? s1 s2) -1])))
+
+(define string-length-comp
+  (λ (s1 s2)
+    (- (string-length s1) (string-length s2))))
+
+
+(define-struct treemap (comparison bst))
+;A [TreeMap X Y] is a (make-treemap [Comparison X] [BST X Y])
+;Interp: a (make-treemap c b) represents a tree b where any two keys within it
+;can be compared using the function c to determine which one should come first
+
+#;(define (treemap-temp tm)
+    ( ... (treemap-comparison tm)  ... (bst-temp (treemap-bst tm)) ... ))
+
+(define tm0 (make-treemap - 'leaf))
+(define tm1 (make-treemap string-order-comp bst1))
+(define tm2 (make-treemap string-length-comp bst1))
+(define tm3 (make-treemap - bst2))
+
+; Exercise 3
+; insert : X Y TreeMap -> TreeMap
+; Places a the given pair of key and info into the treemap,
+; replaces any already existing pair with the same key
+
+
+;these are functions for testing
+;str-order-comp? [Comparison String] -> Boolean
+;Is the given string comparison one that evaluates by order?
+;(at least for the three given tests)
+(define (str-order-comp? comp)
+  (and
+   (positive? (comp "hi" "ah"))
+   (negative? (comp "ah" "hi"))
+   (zero? (comp "hi" "hi"))))
+(check-expect (str-order-comp? string-order-comp) #t)
+(check-expect (str-order-comp? string-length-comp) #f)
+
+;str-length-comp? [Comparison String] -> Boolean
+;Is the given string comparison one that evaluates by length?
+;(at least for the three given tests)
+(define (str-length-comp? comp)
+  (and
+   (positive? (comp "hi" "q"))
+   (negative? (comp "a" "hi"))
+   (zero? (comp "hi" "hi"))))
+(check-expect (str-length-comp? string-length-comp) #t)
+(check-expect (str-length-comp? string-order-comp) #f)
+
+;subtraction-comp? [Comparison String] -> Boolean
+;Is the given number comparison subtraction?
+;(at least for the three given tests)
+(define (subtraction-comp? comp)
+  (and
+   (positive? (comp 100 4))
+   (negative? (comp 4 100))
+   (zero? (comp 4 4))))
+(check-expect (subtraction-comp? -) #t)
+(check-expect (subtraction-comp? (λ (x1 x2) (- x2 x1))) #f)
+
+(check-expect (treemap-bst (insert 4 "bruh" tm0))
+              (treemap-bst (make-treemap - (make-node 4 "bruh" 'leaf 'leaf))))
+(check-expect (subtraction-comp? (treemap-comparison (insert 4 "bruh" tm0))) #t)
+
+(check-expect (treemap-bst (insert "never" 1 tm1))
+              (treemap-bst (make-treemap string-order-comp
+                                         (make-node "hi" 2 'leaf
+                                                    (make-node "never" 1 'leaf 'leaf)))))
+(check-expect (str-order-comp? (treemap-comparison (insert "never" 1 tm1))) #t)
+
+(check-expect (treemap-bst (insert "hi" 4 tm1))
+              (treemap-bst (make-treemap string-length-comp (make-node "hi" 4 'leaf 'leaf))))
+(check-expect (str-length-comp? (treemap-comparison (insert "hi" 4 tm1))) #f)
+
+(check-expect (treemap-bst (insert 420 "haha" tm3))
+              (treemap-bst (make-treemap -
+                                         (make-node 4 "one"
+                                                    (make-node 3 "hi" 'leaf 'leaf)
+                                                    (make-node 5 "yo" 'leaf
+                                                               (make-node 9 "brr" 'leaf
+                                                                          (make-node 420 "haha"
+                                                                                     'leaf
+                                                                                     'leaf)))))))
+(check-expect (subtraction-comp? (treemap-comparison (insert 420 "haha" tm3))) #t)
+(define (insert k i tm)
+  (local [; insert\bst X Y BST -> BST
+          ; Places a the given pair of key and info into the treemap,
+          ; replaces any already existing pair with the same key
+          (define (insert\bst ke in bst)
+            (cond
+              [(symbol? bst) (make-node ke in 'leaf 'leaf)]
+              [(node? bst) (cond
+                             [(< ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (make-node (node-key bst) (node-info bst)
+                                         (insert\bst ke in (node-left bst)) (node-right bst))]
+                             [(> ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (make-node (node-key bst) (node-info bst) (node-left bst)
+                                         (insert\bst ke in (node-right bst)))]
+                             [(= ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (make-node ke in (node-left bst) (node-right bst))])]))]
+    (make-treemap (treemap-comparison tm)  (insert\bst k i (treemap-bst tm)))))
+
+; Exercise 4
+; find : X TreeMap -> TreeMap
+; finds the info relating to the given key in a treemap
+
+(check-error (find 5 tm0))
+(check-expect (find "hi" tm1) 2)
+(check-error (find 70 tm2))
+(check-expect (find 5 tm3) "yo")
+
+
+(define (find k tm)
+  (local [; find\bst X BST -> BST
+          ; Places a the given pair of key and info into the treemap,
+          ; replaces any already existing pair with the same key
+          (define (find\bst ke bst)
+            (cond
+              [(symbol? bst) (error "key not in tree")]
+              [(node? bst) (cond
+                             [(< ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (find\bst ke (node-left bst))]
+                             [(> ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (find\bst ke (node-right bst))]
+                             [(= ((treemap-comparison tm) ke (node-key bst)) 0)
+                              (node-info bst)])]))]
+    (find\bst k (treemap-bst tm))))
+  
+; Exercise 5
+; submap : X X TreeMap -> TreeMap
+; Turns the binary search tree of the given TreeMap into a subtree
+; containing all keys in range [_lo_, _hi_]
+
+(check-expect (treemap-bst (submap 0 100 tm0))
+              (treemap-bst (make-treemap - 'leaf)))
+(check-expect (treemap-bst (submap "h" "hz" tm1))
+              (treemap-bst (make-treemap string-order-comp (make-node "hi" 2 'leaf' leaf))))
+(check-expect (treemap-bst (submap "hz" "q" tm2))
+              (treemap-bst (make-treemap string-length-comp 'leaf)))
+(check-expect (treemap-bst (submap "a" "d" tm2))
+              (treemap-bst (make-treemap string-length-comp 'leaf)))
+(check-expect (treemap-bst (submap "hz" "z" tm2))
+              (treemap-bst (make-treemap string-length-comp 'leaf)))
+(check-expect (treemap-bst (submap 3 5 tm3))
+              (treemap-bst (make-treemap - (make-node 4 "one"
+                                                      (make-node 3 "hi" 'leaf 'leaf)
+                                                      (make-node 5 "yo" 'leaf 'leaf)))))
+
+(define (submap lo hi tm)
+  (local [; subtree : X X BST -> BST
+          ; Turns the binary search tree into a subtree containing all keys in range [_lo_, _hi_]
+          (define (subtree l h bst)
+            (cond
+              [(symbol? bst) 'leaf]
+              [(node? bst) (cond
+                             [(< ((treemap-comparison tm) (node-key bst) l) 0) 'leaf]
+                             [(> ((treemap-comparison tm) (node-key bst) h) 0) 'leaf]
+                             [(and (>= ((treemap-comparison tm) (node-key bst) l) 0)
+                                   (<= ((treemap-comparison tm) (node-key bst) h) 0))
+                              (make-node (node-key bst) (node-info bst)
+                                         (subtree l h(node-left bst))
+                                         (subtree l h (node-right bst)))])]))]
+    (make-treemap (treemap-comparison tm) (subtree lo hi (treemap-bst tm)))))
+                             
+; Exercise 6
+
+; A SExpr is one of:
+; - Symbol
+; - [List-of SExpr]
+
+; A [List-of SExpr] is one of:
+; - '()
+; - (cons SExpr [List-of SExpr])
+
+#;(define (les-temp les)
+    (cond
+      [(empty? les) ... ]
+      [(cons? les) ... ]))
+
+#;(define (se-temp se)
+    (cond
+      [(symbol? se) ... ]
+      [(list? se) ... (les-temp se)]))
+
+(define s1 'bruh)
+(define s2 (list 'zeroth 'first 'second 'third 'fourth 'fifth))
+(define s3 (list (list 'yo 'no 'way)
+                 (list 'never 'gonna 'give 'you 'up) 'never 'gonna 'let 'you 'down))
+
+; topsy-turvy : SExpr -> SExpr
+; Inverts the SExpr
+
+(check-expect (topsy-turvy s1) 'bruh)
+(check-expect (topsy-turvy s2) (list 'fifth 'fourth 'third 'second 'first 'zeroth))
+(check-expect (topsy-turvy s3) (list 'down 'you 'let 'gonna 'never
+                                     (list 'up 'you 'give 'gonna 'never) (list 'way 'no 'yo)))
+
+(define (topsy-turvy se)
+  (cond
+    [(symbol? se) se]
+    [(list? se) (foldl cons '() (map topsy-turvy se))]))
+
+; Exercise 7
+
+; A [List-of Symbol] is one of:
+; - '()
+; - (cons Symbol [List-of Symbol])
+
+
+;A Path is a [List-of Number]
+(define p0 '())
+(define p1 (list 1 2))
+;A CompletePath is a (cons 'complete [List-of Number])
+;it represents a path that is complete, as the given element has been found
+(define cp0 (list 'complete))
+(define cp1 (list 'complete 1 2))
+
+
+
+; A MaybePath is one of:
+; #f
+; [List-of Number]
+(define mp0 #f)
+(define mp1 p0)
+(define mp2 p1)
+
+; A MaybeCompletePath is one of:
+; #f
+; CompletePath
+(define mcp0 #f)
+(define mcp1 cp0)
+(define mcp2 cp1)
+
+; A PathOrCompletePath is one of:
+; Path
+; CompletePath
+(define pcp0 p0)
+(define pcp1 cp0)
+(define pcp2 p1)
+(define pcp3 cp1)
+
+; A MaybePathOrCompletePath is one of:
+; #f
+; Path
+; CompletePath
+(define mpcp0 #f)
+(define mpcp1 p0)
+(define mpcp2 cp0)
+(define mpcp3 p1)
+(define mpcp4 cp1)
+
+;reverse-and-remove-complete: CompletePath -> Path
+;removes 'complete from CompletePath and reverses the rest of the list
+(define (reverse-and-remove-complete cp)
+  (reverse (rest cp)))
+(check-expect (reverse-and-remove-complete (list 'complete)) '())
+(check-expect (reverse-and-remove-complete (list 'complete 1)) (list 1))
+(check-expect (reverse-and-remove-complete (list 'complete 1 2 3)) (list 3 2 1))
+
+
+;find-path/sexpr: Sexpr Symbol PathOrCompletePath -> MaybeCompletePath
+;returns the CompletePath to the symbol in the sexpr, in reverse order
+;given the current path to the sexpr, if the given path is not complete.
+;if the given path is complete, simply returns the given Path
+(define (find-path/sexpr se sym indexes)
+  (if (and (cons? indexes) (symbol? (first indexes))) indexes
+      ;if the first element in index is a symbol (ie 'complete),
+      ;it means we have found the proper index
+      ;and should then stop the recursion
+      (cond
+        [(symbol? se) (if (symbol=? se sym) (list 'complete) #f)]
+        [(list? se) (find-path/listofsymbols se sym indexes)])))
+(check-expect (find-path/sexpr s1 'hi (list 0)) #f)
+(check-expect (find-path/sexpr s1 'bruh (list 0)) (list 'complete))
+(check-expect (find-path/sexpr s2 'third (list 0 1)) (list 'complete 3 1))
+(check-expect (find-path/sexpr s2 'third (list 1)) (list 'complete 4))
+(check-expect (find-path/sexpr s3 'gonna (list 0)) (list 'complete 2 1))
+(check-expect (find-path/sexpr s3 'notinexp (list 0)) #f)
+
+;find-path/listofsymbols: [List-of Symbol] Symbol PathOrCompletePath -> MaybeCompletePath
+;returns the CompletePath to the symbol in the list of symbols, in reverse order
+;given the current path to the list of symbols, if the given path is not complete.
+;if the given path is complete, simply returns the given Path
+(define (find-path/listofsymbols los sym indexes)
+  (local [;append-or-continue-recurring: MaybePathOrCompletePath -> MaybePathOrCompletePath
+          (define (append-or-continue-recurring new-indexes)
+            (if (and (cons? indexes) (symbol? (first indexes))) indexes
+                ;if the first element in index is a symbol (ie 'complete),
+                ;it means we have found the proper index
+                ;and should then stop the recursion
+                (cond
+                  [(boolean? new-indexes)
+                   (find-path/listofsymbols (rest los) sym (cons (add1 (first indexes))
+                                                                 (rest indexes)))]
+                  [(list? new-indexes) (append new-indexes indexes)])))]
+    (if (and (cons? indexes) (empty? (first indexes))) indexes
+        ;if the first element in index is a symbol (ie 'complete),
+        ;it means we have found the proper index
+        ;and should then stop the recursion
+        (cond
+          [(empty? los) #f]
+          [(cons? los)
+           (append-or-continue-recurring (find-path/sexpr (first los) sym indexes))]))))
+
+(check-expect (find-path/listofsymbols s2 'third (list 0 1)) (list 'complete 3 1))
+(check-expect (find-path/listofsymbols s2 'third (list 1)) (list 'complete 4))
+(check-expect (find-path/listofsymbols s2 'third (list 'complete 0 1)) (list 'complete 0 1))
+(check-expect (find-path/listofsymbols s3 'gonna (list 0)) (list 'complete 2 1))
+(check-expect (find-path/listofsymbols s3 'notinexp (list 0)) #f)
+
+
+;find-path: Sexpr Symbol -> MaybePath
+;returns the path to the symbol in the sexpr, or #f if there is no path
+(define (find-path se sym)
+  (local [(define cpath (find-path/sexpr se sym (list 0)))]
+    (cond
+      [(boolean? cpath) #f]
+      [(list? cpath) (reverse-and-remove-complete cpath)])))
+(check-expect (find-path s1 'hi) #f)
+(check-expect (find-path s1 'bruh) '())
+(check-expect (find-path s2 'third) (list 3))
+(check-expect (find-path s3 'gonna) (list 1 2))
+(check-expect (find-path s3 'notinexp) #f)
+
+
+
+
+;Exercise 8
+; A Bool is a [X X -> X]
+(define BOOLT (λ (x1 x2) x1))
+(define BOOLF (λ (x1 x2) x2))
+
+;bool->boolean: Bool->Boolean
+;returns the boolean value that corresponds to the given BOOL
+(define (bool->boolean b)
+  (b #t #f))
+(check-expect (bool->boolean BOOLT) #t)
+(check-expect (bool->boolean BOOLF) #f)
+
+;and/bool: Bool Bool -> Bool
+;outputs BOOLT if both Bools are BOOLT, BOOLF otherwise
+(define (and/bool b1 b2)
+  (b1 b2 BOOLF))
+    
+(check-expect (bool->boolean (and/bool BOOLT BOOLT)) #t)
+(check-expect (bool->boolean (and/bool BOOLT BOOLF)) #f)
+(check-expect (bool->boolean (and/bool BOOLF BOOLT)) #f)
+(check-expect (bool->boolean (and/bool BOOLF BOOLF)) #f)
+
+;or/bool: Bool Bool -> Bool
+;outputs BOOLT if at least one of the two Bools are BOOLT, BOOLF otherwise
+(define (or/bool b1 b2)
+  (b1 b1 b2))
+(check-expect (bool->boolean (or/bool BOOLT BOOLT)) #t)
+(check-expect (bool->boolean (or/bool BOOLT BOOLF)) #t)
+(check-expect (bool->boolean (or/bool BOOLF BOOLT)) #t)
+(check-expect (bool->boolean (or/bool BOOLF BOOLF)) #f)
+
+;or/bool: Bool -> Bool
+;outputs BOOLT if the input is BOOLF, BOOLF otherwise
+(define (not/bool b)
+  (b BOOLF BOOLT))
+(check-expect (bool->boolean (not/bool BOOLT)) #f)
+(check-expect (bool->boolean (not/bool BOOLF)) #t)
+
+; Exercise 13
+
+; An Expression is one of:
+; - Number
+; - Symbol
+(define-struct add [left right])
+; - (make-add Expression Expression)
+(define-struct mul [left right])
+; - (make-mul Expression Expression)
+
+#;(define (exp-temp exp)
+    (cond
+      [(number? exp) exp ]
+      [(symbol? exp) exp ]
+      [(add? exp) ... (exp-temp (add-left exp)) ... (exp-temp (add-right exp)) ... ]
+      [(mul? exp) ... (exp-temp (mul-left exp)) ... (exp-temp (mul-right exp)) ... ]))
+
+(define exp1 (make-add 0 'x)) ; same as just 'x
+(define exp2 (make-add (make-add 1 2) 0)) ; same as just (make-add 1 2)
+(define exp3 (make-mul 1 'y)) ; same as just 'y
+(define exp4 (make-mul 3 (make-add 1 0))) ; same as just 3
+
+; simplify : Expression -> Expression
+; simplifies the expressions based on the additive identity of 0 and the identity property of 1
+
+(check-expect (simplify exp1) 'x)
+(check-expect (simplify exp2) (make-add 1 2))
+(check-expect (simplify exp3) 'y)
+(check-expect (simplify exp4) 3)
+
+(define (simplify exp)
+  (local [; simp-add : Expression Expression -> Expression
+          ; if the one of the two expresions is a 0, then return the other expression
+          ; else returns an add of these two expressions
+          (define (simp-add l r)
+            (cond
+              [(and (number? l) (= l 0)) r]
+              [(and (number? r) (= r 0)) l]
+              [else (make-add l r)]))
+          ; simp-mul : Expression -> Expression
+          ; if the one of the two expresions is a 1, then return the other expression
+          ; else returns a mult of these two expressions
+          (define (simp-mul l r)
+            (cond
+              [(and (number? l) (= l 1)) r]
+              [(and (number? r) (= r 1)) l]
+              [else (make-mul l r)]))]
+    (cond
+      [(number? exp) exp]
+      [(symbol? exp) exp]
+      [(add? exp) (simp-add (simplify (add-left exp)) (simplify (add-right exp)))]
+      [(mul? exp) (simp-mul (simplify (mul-left exp)) (simplify (mul-right exp)))])))
+
+;compact: Expression -> Expression
+;evaluates the given expression and returns the result
+(check-expect (compact exp1) 'x)
+(check-expect (compact exp3) 'y)
+(check-expect (compact exp4) 3)
+(check-expect (compact (make-add 3 4)) 7)
+(check-expect (compact (make-add 3 'x)) (make-add 3 'x))
+(check-expect (compact (make-add 'x 3)) (make-add 'x 3))
+(check-expect (compact (make-add 'y 'x)) (make-add 'y 'x))
+(check-expect (compact (make-mul 3 4)) 12)
+(check-expect (compact (make-mul 3 'x)) (make-mul 3 'x))
+(check-expect (compact (make-mul 'x 3)) (make-mul 'x 3))
+(check-expect (compact (make-mul 'y 'x)) (make-mul 'y 'x))
+(check-expect (compact (make-add (make-mul 3 (make-mul 1 'x)) (make-add 4 6)))
+              (make-add (make-mul 3 'x) 10))
+
+
+(define (compact exp)
+  (local [; simp-add : Expression Expression -> Expression
+          ; if the one of the two expresions is a 0, then return the other expression
+          ; else returns an add of these two expressions
+          (define (compact-add l r)
+            (cond
+              [(and (number? l) (number? r)) (+ l r)]
+              [(and (number? l) (symbol? r)) (simplify (make-add l r))]
+              [(and (symbol? l) (number? r)) (simplify (make-add l r))]
+              [else (make-add l r)]))
+          ; simp-mul : Expression -> Expression
+          ; if the one of the two expresions is a 1, then return the other expression
+          ; else returns a mult of these two expressions
+          (define (compact-mul l r)
+            (cond
+              [(and (number? l) (number? r)) (* l r)]
+              [(and (number? l) (symbol? r)) (simplify (make-mul l r))]
+              [(and (symbol? l) (number? r)) (simplify (make-mul l r))]
+              [else (make-mul l r)]))]
+    (cond
+      [(number? exp) exp]
+      [(symbol? exp) exp]
+      [(add? exp) (compact-add (compact (add-left exp)) (compact (add-right exp)))]
+      [(mul? exp) (compact-mul (compact (mul-left exp)) (compact (mul-right exp)))])))
